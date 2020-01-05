@@ -1,5 +1,9 @@
 package bgu.spl.mics;
 
+import bgu.spl.mics.application.messages.ExpirationBroadcastEvent;
+import bgu.spl.mics.application.messages.MissionRecivedEvent;
+import bgu.spl.mics.application.subscribers.M;
+
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -40,25 +44,27 @@ public class MessageBrokerImpl implements MessageBroker {
 
 	@Override
 	public <T> void subscribeEvent(Class<? extends Event<T>> type, Subscriber m) {
-		// use Map 1,
-		if(topicsOfSubscribers.containsKey(type)){
-			topicsOfSubscribers.get(type).add(m);
-		}
-		else {
-			ConcurrentLinkedQueue<Subscriber> queue = new ConcurrentLinkedQueue<Subscriber>();
-			queue.add(m);
-			topicsOfSubscribers.put(type, queue);
-		}
-		synchronized(messagesPerSubscriber)
-		{
+//		synchronized (topicsOfSubscribers) {
+		if(topicsOfSubscribers.containsKey(type)) {
+
+				topicsOfSubscribers.get(type).add(m);
+			}
+		else{
+				ConcurrentLinkedQueue<Subscriber> queue = new ConcurrentLinkedQueue<Subscriber>();
+				queue.add(m);
+				topicsOfSubscribers.put(type, queue);
+			}
+//		}
+		//synchronized(messagesPerSubscriber)
+		//{
 			messagesPerSubscriber.putIfAbsent(m, new LinkedBlockingQueue<Message>());
-		}
+		//}
 
 	}
 
 	@Override
 	public void subscribeBroadcast(Class<? extends Broadcast> type, Subscriber m) {
-		synchronized (this) {
+		synchronized (topicsOfSubscribers) {
 			if (topicsOfSubscribers.containsKey(type)) {
 				topicsOfSubscribers.get(type).add(m);
 			} else {
@@ -67,82 +73,90 @@ public class MessageBrokerImpl implements MessageBroker {
 				topicsOfSubscribers.put(type, queue);
 			}
 		}
+		//synchronized(messagesPerSubscriber) {
 			messagesPerSubscriber.putIfAbsent(m, new LinkedBlockingQueue<Message>());
-
+		//}
 		}
 
 	@Override
 	public <T> void complete(Event<T> e, T result) {
-		// todo: generics
-
-		System.out.println("MSGI complete called , before null check");
 		Future<T> future = futureMap.get(e);
-		if(future != null)
-			System.out.println("MSGI complete called, after null");
+		if(future != null) {
 			future.resolve(result);
-
+		}
 	}
 
 	@Override
 	public void sendBroadcast(Broadcast b) {
+		if(b instanceof ExpirationBroadcastEvent){
+			for(Subscriber s: messagesPerSubscriber.keySet()){
+				if(s instanceof M){
+					BlockingQueue<Message> queue = messagesPerSubscriber.get(s);
+					for(Message e:queue)
+					{
+						if(e instanceof MissionRecivedEvent)
+						{
+							((MissionRecivedEvent) e).setTerminated(true);
+						}
+					}
+				}
+			}
+		}
 		Class broadClassType = b.getClass();
 		if(topicsOfSubscribers.containsKey(broadClassType)) {
-			ConcurrentLinkedQueue<Subscriber> queue = topicsOfSubscribers.get(broadClassType); // take first subscriber
+			ConcurrentLinkedQueue<Subscriber> queue = topicsOfSubscribers.get(broadClassType);
 			ConcurrentLinkedQueue<Subscriber> newQueue = new ConcurrentLinkedQueue<Subscriber>();
-			synchronized (queue) {
+//			synchronized (queue) {
 
 				for (Subscriber s : queue) {
-					synchronized (newQueue){newQueue.add(s);}
-//				ConcurrentLinkedQueue<Message> queueOfMess = new ConcurrentLinkedQueue<>();
+					//synchronized (newQueue){
+						newQueue.add(s);
+					//}
 					BlockingQueue<Message> queueOfMess = messagesPerSubscriber.get(s);
 					if (queueOfMess == null) {
 						queueOfMess = new LinkedBlockingQueue<>();
 					}
+					//synchronized (queueOfMess){
 					queueOfMess.add(b);
+					//}
 					messagesPerSubscriber.put(s, queueOfMess);
 				}
 				topicsOfSubscribers.put(broadClassType, newQueue);
-			}
+//			}
 		}
 	}
 
 	@Override
 	public <T> Future<T> sendEvent(Event<T> e) {
 		Class eventClassType = e.getClass();
-
-		Future<T> returnFuture = new Future<T>(); //we just create future, without modifying it
-		// we should return null if there is no suitable subscriber
+		Future<T> returnFuture = new Future<T>();
 		synchronized (futureMap)
 		{
 			futureMap.put(e, returnFuture);
 		}
-
-		synchronized (topicsOfSubscribers) {
 			synchronized(messagesPerSubscriber){
 			if (topicsOfSubscribers.containsKey(eventClassType)) {
 				ConcurrentLinkedQueue<Subscriber> queueOfSubscribers = topicsOfSubscribers.get(eventClassType);
 				BlockingQueue<Message> queueOfMess = new LinkedBlockingQueue<>();
 				if (!queueOfSubscribers.isEmpty()) {
+
 					Subscriber s1 = queueOfSubscribers.poll();
 					queueOfSubscribers.add(s1);
-
-					if (messagesPerSubscriber.get(s1) != null) {
-						queueOfMess = messagesPerSubscriber.get(s1);
+						if (messagesPerSubscriber.get(s1) != null) {
+							queueOfMess = messagesPerSubscriber.get(s1);
+						}
+						queueOfMess.add(e);
+						messagesPerSubscriber.put(s1, queueOfMess);
 					}
-					queueOfMess.add(e);
-					messagesPerSubscriber.put(s1, queueOfMess);
-				}
 			} else {
 				return null;
 			}
 			return returnFuture;
 		}
-		}
 	}
 
 	@Override
 	public void register(Subscriber m) {
-		// Map 2
 		messagesPerSubscriber.putIfAbsent(m, new LinkedBlockingQueue<Message>());
 	}
 
@@ -150,22 +164,20 @@ public class MessageBrokerImpl implements MessageBroker {
 	public void unregister(Subscriber m) {
 		synchronized (m){
 			for(Class<? extends Message> cl :topicsOfSubscribers.keySet()){
-				topicsOfSubscribers.get(cl).remove(m);
-			}
-
-			while(!messagesPerSubscriber.get(m).isEmpty())
-			{
-
+				synchronized (topicsOfSubscribers) {
+					topicsOfSubscribers.get(cl).remove(m);
+				}
 			}
 			messagesPerSubscriber.remove(m);
-
 		}
 	}
 
 	@Override
 	public Message awaitMessage(Subscriber m) throws InterruptedException {
 		synchronized (m){
-			return messagesPerSubscriber.get(m).take();
+			if(messagesPerSubscriber.get(m)!=null)
+				return messagesPerSubscriber.get(m).take();
+			return null;
 		}
 	}
 

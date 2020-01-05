@@ -14,11 +14,6 @@ public class Squad {
 
 	private Map<String, Agent> agents = new HashMap<>();
 
-//	public Map<String, Agent> getAgents()
-//	{
-//		return agents;
-//	}
-
 	/**
 	 * Retrieves the single instance of this class.
 	 */
@@ -40,7 +35,8 @@ public class Squad {
 	public void load (Agent[] agents) {
 		for(int i=0; i<agents.length; i++)
 		{
-			this.agents.put(agents[i].getSerialNumber(), agents[i]);
+			Agent agent = new Agent(agents[i].getSerialNumber(), agents[i].getName());
+			this.agents.put(agents[i].getSerialNumber(), agent);
 		}
 	}
 
@@ -48,16 +44,10 @@ public class Squad {
 	 * Releases agents.
 	 */
 	public void releaseAgents(List<String> serials){
-		synchronized (getInstance().agents) {
-			for (String s : serials) {
-				agents.get(s).release(); // release agent with the serial s;
-			}
-			System.out.println("Squad, releaseAgents, before notifyall");
-			/*this*/
-			getInstance().agents.notifyAll();
-			System.out.println("Squad, releaseAgents, after notifyall");
+		for(String s: serials)
+		{
+			agents.get(s).release();
 		}
-
 	}
 
 	/**
@@ -67,20 +57,11 @@ public class Squad {
 	public void sendAgents(List<String> serials, int time){
 		// first - sleep for the squad when they go to the mission
 		try {
-			System.out.println("Squad, sendAgents, before sleep " + time);
-			Thread.sleep(time);
-			System.out.println("Squad, sendAgents, after sleep ");
+			Thread.currentThread().sleep(time*100);
 		}
 		catch(InterruptedException e) {}
-
 		for(String serial:serials) {
-			synchronized (getInstance().agents) {
-				agents.get(serial).release();
-				System.out.println("Squad, sendAgents, before notifyall");
-				/*this*/
-				getInstance().agents.notifyAll();
-				System.out.println("Squad, sendAgents, after notifyall");
-			}
+			agents.get(serial).release();
 		}
 	}
 
@@ -89,37 +70,19 @@ public class Squad {
 	 * @param serials   the serial numbers of the agents
 	 * @return ‘false’ if an agent of serialNumber ‘serial’ is missing, and ‘true’ otherwise
 	 */
-
 	public boolean getAgents(List<String> serials) throws InterruptedException {
-
 		serials.sort(String::compareTo);
-		synchronized (getInstance().agents) { // check if here or later
 			for (String serial : serials) {
-				System.out.println("Squad - int getAgents method, serial number is: " + serial);
 				Agent agent = getInstance().agents.get(serial);
-				System.out.println("Squad - getAgents - agent: " + agent.getName() + "is available? " + agent.isAvailable());
-				if (/*!agents.containsKey(serial)*/agent == null) {
-					System.out.println("we do not contain serial: " + serial);
+				if (agent == null) {
 					return false;
 				}
 			}
-
-			for (String serial : serials) {
-				Agent agent = getInstance().agents.get(serial);
-					while (agent.isAvailable()) {
-					try {
-						System.out.println("We are waiting in squad getAgents");
-//						Thread.currentThread().sleep(100);
-						 getInstance().agents.wait();
-					} catch (InterruptedException e) {}
-				}
-					agent.acquire();
-				//agents.get(serial).acquire();
-				System.out.println("Agent " + agents.get(serial) + " is now acquired");
-			}
+		for(String serial: serials)
+			agents.get(serial).acquire();
 			return true;
 		}
-	}
+
 
 	/**
 	 * gets the agents names
@@ -131,9 +94,9 @@ public class Squad {
 		for(String s:serials)
 		{
 			if(agents.get(s) != null)
-				retList.add(agents.get(s).getName()); // adds the name of all agents to the list we will return
+				retList.add(agents.get(s).getName());
 		}
 		return retList;
 	}
-
 }
+

@@ -1,14 +1,18 @@
 package bgu.spl.mics.application.subscribers;
 
+import bgu.spl.mics.Future;
+import bgu.spl.mics.MessageBroker;
+import bgu.spl.mics.MessageBrokerImpl;
 import bgu.spl.mics.Subscriber;
+import bgu.spl.mics.application.ThreadCounter;
 import bgu.spl.mics.application.messages.ExpirationBroadcastEvent;
 import bgu.spl.mics.application.messages.MissionRecivedEvent;
 import bgu.spl.mics.application.passiveObjects.MissionInfo;
 import bgu.spl.mics.application.messages.TickBroadcast;
 
 
-import java.util.Queue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * A Publisher\Subscriber.
@@ -18,37 +22,45 @@ import java.util.concurrent.LinkedBlockingQueue;
  * You MAY change constructor signatures and even add new public constructors.
  */
 public class Intelligence extends Subscriber {
-	Queue<MissionInfo> missionQueue;
-	String name;
+	Map<MissionInfo, Integer> missionMap;
 	int id;
 	public static int ID = 1;
+	private MessageBroker mb;
 
 	public Intelligence() {
 		super("Intelligence" + ID);
 		id = ID;
 		ID++;
-		missionQueue = new LinkedBlockingQueue<>();
+		missionMap = new LinkedHashMap<>();
+		mb = MessageBrokerImpl.getInstance();
 	}
 
-	public void addMission(MissionInfo event){
-		missionQueue.add(event);
+	public void addMission(MissionInfo mission){
+		missionMap.put(mission, mission.getTimeIssued());
 	}
 
-	public void sendMission(MissionInfo m){
+	private void sendMission(MissionInfo m){
 		MissionRecivedEvent missEvent = new MissionRecivedEvent(m.getMissionName(), m.getSerialAgentsNumbers(), m.getGadget(), m.getTimeIssued(), m.getTimeExpired(), m.getDuration());
-		getSimplePublisher().sendEvent(missEvent);
+		Future futureMissionEvent =  getSimplePublisher().sendEvent(missEvent);
 	}
 
 
 	@Override
 	protected void initialize() {
-		//System.out.println("intelligence start initialize" + id);
+		ThreadCounter.getInstance().increase();
+		mb.register(this);
 		subscribeBroadcast(TickBroadcast.class, (tick)-> {
-			while(!missionQueue.isEmpty() && missionQueue.peek().getTimeIssued() <= tick.getCurrentTick()){
-				sendMission(missionQueue.poll());
+			for(MissionInfo mission:missionMap.keySet())
+			{
+				if(mission.getTimeIssued() == tick.getCurrentTick())
+				{
+					sendMission(mission);
+					missionMap.put(mission, 0);
+				}
 			}
+
+
 		});
-		//System.out.println("intelligence initialize" + id);
 
 		subscribeBroadcast(ExpirationBroadcastEvent.class, (broadcast) -> {
 			terminate();

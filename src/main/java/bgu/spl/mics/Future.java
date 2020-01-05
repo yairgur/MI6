@@ -1,6 +1,5 @@
 package bgu.spl.mics;
 
-import java.time.LocalTime;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,16 +33,11 @@ public class Future<T> {
 		synchronized (this){
 			while(!isDone()){
 				try{
-					//System.out.println("Future- ,get method, before wait " + Thread.currentThread().getId());
 					this.wait();
-					System.out.println("Future- ,get method,  after wait " + Thread.currentThread().getId());
 				} catch(InterruptedException e) {
-					//Thread.currentThread().interrupt();
 				}
 			}
-			System.out.println("Future- ,get method, before while " + Thread.currentThread().getId());
 		}
-		System.out.println("result in get  " + result);
 		return result;
 	}
 
@@ -53,9 +47,7 @@ public class Future<T> {
 	public synchronized void resolve (T result) {
 			this.result = result;
 			this.isResolved = true;
-			System.out.println("Future , resolve, before notify all");
 			notifyAll();
-			System.out.println("Future , resolve, after notify all");
 	}
 
 	/**
@@ -77,10 +69,11 @@ public class Future<T> {
 	 *         elapsed, return null.
 	 */
 	public T get(long timeout, TimeUnit unit) {
+		long time = TimeUnit.MILLISECONDS.convert(timeout, unit);
 		synchronized (this) {
 			while (!isDone()){
 				try {
-					this.wait(timeout);
+					this.wait(time * 100);
 				} catch (InterruptedException e) {}
 			}
 			return result;

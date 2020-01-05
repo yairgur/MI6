@@ -3,8 +3,6 @@ import bgu.spl.mics.Publisher;
 import bgu.spl.mics.SimplePublisher;
 import bgu.spl.mics.application.messages.ExpirationBroadcastEvent;
 import bgu.spl.mics.application.messages.TickBroadcast;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -17,15 +15,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * You MAY change constructor signatures and even add new public constructors.
  */
 public class TimeService extends Publisher {
-	private int duration;
-	private Timer timer;
+	private int totalTime;
 	private AtomicLong counter;
 
-	public TimeService(int duration) { // new C'tor
+	public TimeService(int duration) {
 		super("Time Service");
 		counter = new AtomicLong(0);
-		timer = new Timer();
-		this.duration = duration;
+		this.totalTime = duration;
 	}
 
 	@Override
@@ -33,35 +29,11 @@ public class TimeService extends Publisher {
 
 	}
 
-//	//@Override
-//	public void run1() {
-//		System.out.println("Time Service has been init wohoooooooo");
-//		SimplePublisher simplePublisher = new SimplePublisher();
-//		TimerTask taskToDo = new TimerTask()
-//		{
-//			@Override
-//			public void run()
-//			{
-//				if(counter.longValue() <= duration)
-//				{
-//					simplePublisher.sendBroadcast(new TickBroadcast(counter.longValue()));
-//					counter.incrementAndGet();
-//				}
-//				else {
-//					ExpirationBroadcastEvent event = new ExpirationBroadcastEvent();
-//					simplePublisher.sendBroadcast(event);
-//				}
-//			}
-//		};
-//		timer.schedule(taskToDo, 0, 100); //should be delay?
-//
-//	}
-
 	@Override
 	public void run(){
 		boolean arrived = false;
 		SimplePublisher simplePublisher = new SimplePublisher();
-		while(counter.longValue() < duration){
+		while(counter.longValue() < totalTime){
 			try {
 				counter.incrementAndGet();
 				Thread.sleep(100);
@@ -70,7 +42,7 @@ public class TimeService extends Publisher {
 				e.printStackTrace();
 			}
 
-			if(counter.longValue() == duration-1){
+			if(counter.longValue() == totalTime){
 				arrived = true;
 			}
 			if(arrived)

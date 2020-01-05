@@ -34,18 +34,6 @@ public class Inventory {
 	public static Inventory getInstance() {
 		return Inventory.SingletonHolder.instance;
 	}
-	/*
-	private static class SingletonHolder {
-		private static Inventory instance = new Inventory();
-	}
-
-	public static Inventory getInstance()
-	{
-		if(instance==null)
-			instance = new Inventory();
-		return Inventory.SingletonHolder.instance;
-	}
-	*/
 
 	/**
      * Initializes the inventory. This method adds all the items given to the gadget
@@ -55,7 +43,6 @@ public class Inventory {
      * 						of the inventory.
      */
 	public void load (String[] inventory) {
-		//this.gadgets = this.getGadgets();
 		for(int i=0; i<inventory.length; i++)
 		{
 			this.gadgets.add(inventory[i]);
@@ -68,23 +55,12 @@ public class Inventory {
      * @param gadget 		Name of the gadget to check if available
      * @return 	‘false’ if the gadget is missing, and ‘true’ otherwise
      */
-	public boolean getItem(String gadget){
-		boolean flag = false;
-		for(String s:gadgets)
-		{
-			if(s.equals(gadget))
+	public synchronized boolean getItem(String gadget){
+			if(!gadgets.contains(gadget))
 			{
-				flag = true;
+				return false;
 			}
-		}
-		if(!flag)
-			return false;
-		else
-		{
-			synchronized (gadgets){ // todo: we should check if the sync should be in the begining;
-				gadgets.remove(gadget);
-			}
-		}
+			gadgets.remove(gadget);
 		return true;
 	}
 
@@ -97,7 +73,7 @@ public class Inventory {
 	 */
 	public void printToFile(String filename){
 		try (Writer writer = new FileWriter(filename)) {
-			Gson gson = new GsonBuilder().create();
+			Gson gson = new GsonBuilder().setPrettyPrinting().create();
 			gson.toJson(gadgets, writer);
 		}
 		catch(IOException e) {}

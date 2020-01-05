@@ -3,13 +3,13 @@ package bgu.spl.mics.application.messages;
 import bgu.spl.mics.Event;
 
 public class GadgetAvailableEvent implements Event<Integer> {
-    private String name;
+    private String gadget;
 
     public GadgetAvailableEvent(String name){
-        this.name = name;
+        this.gadget = name;
     }
 
-    public String getName(){
-        return this.name;
+    public String getGadget(){
+        return this.gadget;
     }
 }

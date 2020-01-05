@@ -1,10 +1,11 @@
 package bgu.spl.mics.application.subscribers;
 
+import bgu.spl.mics.MessageBroker;
+import bgu.spl.mics.MessageBrokerImpl;
 import bgu.spl.mics.Subscriber;
-import bgu.spl.mics.application.messages.ExpirationBroadcastEvent;
+import bgu.spl.mics.application.ThreadCounter;
+import bgu.spl.mics.application.messages.*;
 import bgu.spl.mics.application.messages.GadgetAvailableEvent;
-import bgu.spl.mics.application.messages.GadgetAvailableEvent;
-import bgu.spl.mics.application.messages.TickBroadcast;
 import bgu.spl.mics.application.passiveObjects.Inventory;
 
 /**
@@ -18,6 +19,7 @@ public class Q extends Subscriber {
 	public static int ID = 1;
 	private int id;
 	private int currentTime;
+	private MessageBroker mb;
 
 	private static class SingletonHolder {
 		private static Q instance = new Q();
@@ -35,19 +37,20 @@ public class Q extends Subscriber {
 		id = ID;
 		ID++;
 		currentTime = 0;
+		mb = MessageBrokerImpl.getInstance();
 	}
 
 	@Override
 	protected void initialize() {
-		//System.out.println("Q start initialize" + id);
-
+		ThreadCounter.getInstance().increase();
+		mb.register(this);
 		subscribeBroadcast(TickBroadcast.class, (broadcast) -> {
 			currentTime = (int)broadcast.getCurrentTick();
 		});
 
 		subscribeEvent(GadgetAvailableEvent.class, (event)-> {
-			String name = event.getName();
-			boolean result = inventoryInstance.getItem(name);
+			String gadget = event.getGadget();
+			boolean result = inventoryInstance.getItem(gadget);
 			if(result){
 				complete(event, currentTime);
 			}
@@ -55,10 +58,10 @@ public class Q extends Subscriber {
 				complete(event, null);
 			}
 		});
-		//System.out.println("Q finish initialize" + id);
 
-		subscribeBroadcast(ExpirationBroadcastEvent.class, (broadcast) -> {
+		subscribeBroadcast(ExpirationToOthers.class, (broadcast) -> {
 			terminate();
 		});
+
 	}
 }

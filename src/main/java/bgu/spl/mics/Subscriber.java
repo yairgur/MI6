@@ -117,20 +117,21 @@ public abstract class Subscriber extends RunnableSubPub {
      */
     @Override
     public final void run() {
-        mb.register(this);
         initialize();
         Message receivedMessage;
 
         while (!terminated) { // todo: add != intel..
             try {
                 receivedMessage = mb.awaitMessage(this);
-                Callback callback = callBackMap.get(receivedMessage.getClass());
-                callback.call(receivedMessage);
+                if(receivedMessage != null) {
+                    Callback callback = callBackMap.get(receivedMessage.getClass());
+                    callback.call(receivedMessage);
+                }
 
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 System.out.println("-----Subscriber error in run-----");
-                Thread.currentThread().interrupt();
+                //Thread.currentThread().interrupt();
             }
 
         }

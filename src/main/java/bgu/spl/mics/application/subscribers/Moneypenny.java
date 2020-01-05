@@ -1,6 +1,9 @@
 package bgu.spl.mics.application.subscribers;
 
+import bgu.spl.mics.MessageBroker;
+import bgu.spl.mics.MessageBrokerImpl;
 import bgu.spl.mics.Subscriber;
+import bgu.spl.mics.application.ThreadCounter;
 import bgu.spl.mics.application.messages.*;
 import bgu.spl.mics.application.passiveObjects.Squad;
 
@@ -20,6 +23,7 @@ public class Moneypenny extends Subscriber {
 	private int id;
 	private long currentTime;
 	private boolean result = false;
+	private MessageBroker mb;
 
 	public Moneypenny() {
 		super("Moneypenny" + ID);
@@ -27,38 +31,32 @@ public class Moneypenny extends Subscriber {
 		id = ID;
 		ID++;
 		currentTime = 0;
+		mb = MessageBrokerImpl.getInstance();
 	}
 
-	public int getId() // yair added now
+	public int getId()
 	{
 		return id;
 	}
 
 	@Override
 	protected void initialize() {
-//		System.out.println("Moneypenny start initialize" + id);
-
+		ThreadCounter.getInstance().increase();
+		mb.register(this);
 		subscribeBroadcast(TickBroadcast.class, (broadcast) -> {
-			//System.out.println("M- ,initialize method, before getting current tick " + currentTime);
 			currentTime = broadcast.getCurrentTick();
-			//System.out.println("M- ,initialize method, after getting current tick");
 		});
 
-		if(id%2 ==0){
+		if(id%2 != 0){
 		subscribeEvent(AgentsAvailableEvent.class, (event) ->{
-			System.out.println("Moneypenny subscribeEvent AgentsAvailableEvent " + id);
 			List<String> serialAgentsNumber = event.getSerialAgentsNumbers();
-			//boolean result;
 			try {
-				result = squadInstance.getAgents(serialAgentsNumber);
-//				System.out.println("Moneypenny AgentsAvailableEvent lambda in Moneypenny, before complete");
-				if(result){
+				if(squadInstance.getAgents(serialAgentsNumber)){
 					complete(event, true);
 				}
 				else {
 					complete(event, false);
 				}
-				System.out.println("Moneypenny AgentsAvailableEvent lambda in Moneypenny, after complete res = " + result);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -66,39 +64,24 @@ public class Moneypenny extends Subscriber {
 		});
 		}
 		else{
+		subscribeEvent(SendAgentsEvent.class, (event)-> {
+			List<String> serialAgentsNumber = event.getSerialAgentsNumbers();
+			List<String> names = squadInstance.getAgentsNames(serialAgentsNumber);
+			toReturn toReturn = new toReturn(id, names);
+			squadInstance.sendAgents(serialAgentsNumber, event.getDuration());
+			complete(event, toReturn);
+		});
 		subscribeEvent(ReleaseAgentsEvent.class, (event) -> {
 			List<String> serialAgentsNumber = event.getSerialAgentsNumbers();
 			squadInstance.releaseAgents(serialAgentsNumber);
-			System.out.println("Moneypenny ReleaseAgentsEvent lambda in Moneypenny, after releaseAgents in squad, before complete");
 			complete(event, true);
-			System.out.println("Moneypenny ReleaseAgentsEvent lambda in Moneypenny, after complete .res= true");
-		});
-
-		subscribeEvent(SendAgentsEvent.class, (event)-> {
-			List<String> serialAgentsNumber = event.getSerialAgentsNumbers();
-//			System.out.println("Moneypenny serialAgentsNumber lambada, before sendAgents in squad " + serialAgentsNumber);
-			squadInstance.sendAgents(serialAgentsNumber, event.getDuration()*100);
-			System.out.println("Moneypenny serialAgentsNumber lambada, after sendAgents in squad " + serialAgentsNumber + " " + event.getDuration()*100);
-			List<String> names = squadInstance.getAgentsNames(serialAgentsNumber);
-
-			toReturn toReturn = new toReturn(id, names);
-//			System.out.println("Moneypenny serialAgentsNumber,  SendAgentsEvent lambda ,before complete, return value is " + toReturn );
-			complete(event, toReturn);
-			System.out.println("Moneypenny serialAgentsNumber,  SendAgentsEvent lambda ,after complete returned value: " + toReturn.getLs());
 		});
 		}
 
-		subscribeBroadcast(ExpirationBroadcastEvent.class, (broadcast) -> {
+		subscribeBroadcast(ExpirationToOthers.class, (broadcast) -> {
 			terminate();
 		});
 
-//		subscribeBroadcast(ExpirationBroadcastEvent.class, (broadcast) -> {
-//			//System.out.println("Moneypenny, before terminate");
-//			terminate();
-//			//System.out.println("Moneypenny, after terminate");
-//		});
-
-		//System.out.println("Moneypenny finished initialize" + id);
 	}
 }
 

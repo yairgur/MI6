@@ -1,7 +1,6 @@
 package bgu.spl.mics.application.messages;
 
 import bgu.spl.mics.Event;
-
 import java.util.List;
 
 public class MissionRecivedEvent implements Event {
@@ -11,6 +10,7 @@ public class MissionRecivedEvent implements Event {
     private int timeIssued;
     private int timeExpired;
     private int duration;
+    private boolean terminated;
 
     public MissionRecivedEvent(String missionName, List<String> serialAgentsNumbers, String gadget, int timeIssued, int timeExpired, int duration){
         this.missionName = missionName;
@@ -19,6 +19,7 @@ public class MissionRecivedEvent implements Event {
         this.timeIssued = timeIssued;
         this.timeExpired = timeExpired;
         this.duration = duration;
+        this.terminated = false;
     }
 
     public String getMissionName(){
@@ -38,6 +39,12 @@ public class MissionRecivedEvent implements Event {
         return serialAgentsNumbers;
     }
 
+    public boolean isTerminated() { return terminated;}
+
+    public void setTerminated(boolean b)
+    {
+        terminated = b;
+    }
 
     public String getGadget(){
         return gadget;

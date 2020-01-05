@@ -166,7 +166,7 @@ public class Report {
 
 	public String toString()
 	{
-		String str = "\n\n" + "Report values is: \n" + "mission name: " + missionName + " \nM sender: " + M + " \nMoneypenny sender: " + Moneypenny + " \ngadget: " + gadgetNames + " \ntime issued: " + timeIssued + "\n";
+		String str = "\n\n" + "Report values is: \n" + "time tick is: " + timeCreated + "\n" + "mission name: " + missionName + " \nM sender: " + M + " \nMoneypenny sender: " + Moneypenny + " \ngadget: " + gadgetNames + " \ntime issued: " + timeIssued + "\n";
 		return str;
 	}
 }
